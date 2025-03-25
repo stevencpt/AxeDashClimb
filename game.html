@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Axe Dash Climb</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.2/p5.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #000;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+    <script>
+        let ball;
+        let axe;
+        let platforms = [];
+        let slimePlatforms = [];
+        let villains = [];
+        let gravity = 0.5;
+        let friction = 0.8;
+
+        function setup() {
+            createCanvas(windowWidth, windowHeight);
+            ball = {
+                x: width / 2,
+                y: height - 50,
+                r: 20,
+                vx: 0,
+                vy: 0,
+                swinging: false
+            };
+            axe = {
+                length: 40,
+                angle: 0,
+                x: ball.x,
+                y: ball.y
+            };
+            for (let i = 0; i < 5; i++) {
+                platforms.push({
+                    x: random(0, width - 100),
+                    y: height - i * 150,
+                    w: random(100, 200),
+                    h: 20,
+                    slippery: false
+                });
+                if (random() < 0.3) {
+                    slimePlatforms.push({
+                        x: random(0, width - 100),
+                        y: height - (i + 1) * 150,
+                        w: random(100, 200),
+                        h: 20,
+                        slippery: true
+                    });
+                }
+            }
+            for (let i = 0; i < 3; i++) {
+                let platform = random(platforms.concat(slimePlatforms));
+                villains.push({
+                    type: random(['snake', 'raccoon']),
+                    x: platform.x + random(0, platform.w - 30),
+                    y: platform.y - 15,
+                    w: 30,
+                    h: 15,
+                    vx: random(1, 2) * (random() < 0.5 ? 1 : -1),
+                    platform: platform
+                });
+            }
+        }
+
+        function draw() {
+            background(0);
+            let pulse = sin(frameCount * 0.05) * 50 + 200;
+            fill(0, pulse, pulse);
+            rect(0, 0, width, height);
+
+            for (let p of platforms) {
+                fill(150, 50, 255);
+                rect(p.x, p.y, p.w, p.h, 5);
+                triangle(p.x, p.y, p.x + p.w / 2, p.y - 10, p.x + p.w, p.y);
+            }
+            for (let s of slimePlatforms) {
+                fill(0, 255, 100);
+                rect(s.x, s.y, s.w, s.h, 5);
+                triangle(s.x, s.y, s.x + s.w / 2, s.y - 10, s.x + s.w, s.y);
+            }
+
+            ball.vy += gravity;
+            ball.x += ball.vx;
+            ball.y += ball.vy;
+            ball.vx *= friction;
+
+            for (let p of platforms.concat(slimePlatforms)) {
+                if (ball.y + ball.r > p.y && ball.y - ball.r < p.y + p.h &&
+                    ball.x + ball.r > p.x && ball.x - ball.r < p.x + p.w) {
+                    ball.y = p.y - ball.r;
+                    ball.vy = 0;
+                    friction = p.slippery ? 0.6 : 0.8;
+                }
+            }
+
+            if (ball.y > height + ball.r) {
+                ball.y = height - 50;
+                ball.vx = 0;
+                ball.vy = 0;
+            }
+
+            if (mouseIsPressed) {
+                let dx = mouseX - ball.x;
+                let dy = mouseY - ball.y;
+                axe.angle = atan2(dy, dx);
+                axe.x = ball.x + cos(axe.angle) * axe.length;
+                axe.y = ball.y + sin(axe.angle) * axe.length;
+                ball.vx += (mouseX - pmouseX) * 0.1;
+                ball.vy += (mouseY - pmouseY) * 0.1;
+            }
+
+            stroke(255, 100, 100);
+            strokeWeight(4);
+            line(ball.x, ball.y, axe.x, axe.y);
+            fill(200, 50, 50);
+            noStroke();
+            triangle(axe.x, axe.y, axe.x + 10, axe.y - 5, axe.x + 10, axe.y + 5);
+
+            fill(255, 0, 0);
+            noStroke();
+            ellipse(ball.x, ball.y, ball.r * 2);
+
+            for (let v of villains) {
+                v.x += v.vx;
+                if (v.x < v.platform.x || v.x + v.w > v.platform.x + v.platform.w) {
+                    v.vx *= -1;
+                }
+
+                if (v.type === 'snake') {
+                    fill(0, 255, 0);
+                    ellipse(v.x + v.w / 2, v.y + v.h / 2, v.w, v.h);
+                    fill(255, 255, 0);
+                    ellipse(v.x + v.w - 5, v.y + 5, 5, 5);
+                } else if (v.type === 'raccoon') {
+                    fill(100, 100, 100);
+                    rect(v.x, v.y, v.w, v.h, 5);
+                    fill(255, 50, 50);
+                    triangle(v.x + v.w / 2, v.y - 5, v.x + v.w / 2 - 5, v.y, v.x + v.w / 2 + 5, v.y);
+                }
+
+                if (dist(ball.x, ball.y, v.x + v.w / 2, v.y + v.h / 2) < ball.r + v.w / 2) {
+                    ball.vx += v.vx * 2;
+                    ball.vy -= 2;
+                }
+            }
+
+            if (ball.y < height / 2) {
+                let offset = height / 2 - ball.y;
+                ball.y = height / 2;
+                for (let p of platforms.concat(slimePlatforms)) {
+                    p.y += offset;
+                }
+                for (let v of villains) {
+                    v.y += offset;
+                }
+            }
+        }
+
+        function windowResized() {
+            resizeCanvas(windowWidth, windowHeight);
+        }
+    </script>
+</body>
+</html>
